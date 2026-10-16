@@ -1,62 +1,72 @@
+
 from pathlib import Path
+
 import nibabel as nib
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 
-#Patient ID
+# Patient ID
 patient_id = "BraTS-GLI-00000-000"
 
-# Path to the MRI files 
+# Path to the MRI files
 data_dir = Path(__file__).resolve().parent / "data" / patient_id
 
-# Load the FLAIR MRI scan
-mri_path = data_dir / f"{patient_id}-t2f.nii.gz"
-mri = nib.load(str(mri_path))
+# Load all four MRI modalities
+modalities = ["t1n", "t1c", "t2w", "t2f"]
+mri_scans = {}
 
-# Convert MRI to a NumPy array
-mri_data = mri.get_fdata()
+for modality in modalities:
+    file_path = data_dir / f"{patient_id}-{modality}.nii.gz"
 
-# Find the tumor segmentation file
+    scan = nib.load(str(file_path))
+    mri_scans[modality] = scan.get_fdata()
+
+    print(f"{modality}: {mri_scans[modality].shape}")
+
+# Load the tumor segmentation mask
 seg_path = data_dir / f"{patient_id}-seg.nii.gz"
-
-# Load the segmentation mask
 seg = nib.load(str(seg_path))
-
-# Convert it to a NumPy array
 seg_data = seg.get_fdata()
 
-# Print the tumor labels
+# Display information
 print("Segmentation dimensions:", seg_data.shape)
 print("Unique tumor labels:", np.unique(seg_data))
-
-# Display information
 print("MRI loaded successfully!")
-print("MRI dimensions:", mri_data.shape)
-print("Data type:", mri_data.dtype)
-print("Intensity range:", np.min(mri_data), np.max(mri_data))
 
-# Select the middle slice of the brain
-slice_index = 90
+# Select the MRI slice
+slice_index = 65
 
-# Extract a 2d slice from the 3D MRI
-brain_slice = mri_data[:, :, slice_index]
+# Create one window with six MRI images
+fig, axes = plt.subplots(2, 3, figsize=(15, 9))
 
-# Display the MRI
-plt.imshow(brain_slice.T, cmap="gray", origin="lower")
-plt.title(f"Brain MRI - Slice {slice_index}")
-plt.axis("off")
-plt.show()
+# Display the four MRI modalities
+for ax, modality in zip(axes.flat[:4], modalities):
+    image = mri_scans[modality][:, :, slice_index]
 
+    ax.imshow(image.T, cmap="gray", origin="lower")
+    ax.set_title(modality.upper())
+    ax.axis("off")
 
-# Use the same slice as the original MRI
+# Display the original FLAIR MRI
+flair_slice = mri_scans["t2f"][:, :, slice_index]
+
+axes[1, 1].imshow(
+    flair_slice.T,
+    cmap="gray",
+    origin="lower"
+)
+axes[1, 1].set_title("Original FLAIR")
+axes[1, 1].axis("off")
+
+# Extract the tumor segmentation slice
 tumor_slice = seg_data[:, :, slice_index]
 
-# Define segmentation colors:
-# 0 = transparent background
-# 1 = red
-# 2 = yellow
-# 3 = blue
+# Assign colors to tumor labels
+# 0 = Background (hidden)
+# 1 = Tumor core (red)
+# 2 = Surrounding abnormal tissue (yellow)
+# 3 = Enhancing tumor (blue)
 colors = ListedColormap([
     "black",
     "red",
@@ -64,13 +74,18 @@ colors = ListedColormap([
     "blue"
 ])
 
-# Display the MRI
-plt.figure(figsize=(8, 8))
-plt.imshow(brain_slice.T, cmap="gray", origin="lower")
+# Display MRI with tumor segmentation
+axes[1, 2].imshow(
+    flair_slice.T,
+    cmap="gray",
+    origin="lower"
+)
 
-# Overlay tumor labels
-plt.imshow(
-    np.ma.masked_where(tumor_slice.T == 0, tumor_slice.T),
+axes[1, 2].imshow(
+    np.ma.masked_where(
+        tumor_slice.T == 0,
+        tumor_slice.T
+    ),
     cmap=colors,
     vmin=0,
     vmax=3,
@@ -79,6 +94,15 @@ plt.imshow(
     interpolation="nearest"
 )
 
-plt.title("Brain MRI with Tumor Segmentation")
-plt.axis("off")
+axes[1, 2].set_title("Tumor Segmentation")
+axes[1, 2].axis("off")
+
+# Add dashboard title
+plt.suptitle(
+    f"Brain MRI Analysis - {patient_id} - Slice {slice_index}",
+    fontsize=16
+)
+
+# Adjust layout and display everything
+plt.tight_layout()
 plt.show()
