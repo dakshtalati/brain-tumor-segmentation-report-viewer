@@ -14,8 +14,25 @@ patient_id = "BraTS-GLI-00000-000"
 data_dir = Path(__file__).resolve().parent / "data" / patient_id
 
 # Load tumor segmentation
-seg_path = data_dir / f"{patient_id}-seg.nii.gz"
+# Choose which segmentation to display
+use_prediction = True
+
+if use_prediction:
+    seg_path = (
+        Path(__file__).resolve().parent
+        / "predictions"
+        / f"{patient_id}-predicted-seg.nii.gz"
+    )
+else:
+    seg_path = data_dir / f"{patient_id}-seg.nii.gz"
+
+# Load selected segmentation
 seg_image = nib.load(str(seg_path))
+
+print(
+    "Displaying:",
+    "U-Net Prediction" if use_prediction else "BraTS Ground Truth"
+)
 seg_data = np.asarray(seg_image.dataobj)
 
 # Load structural T1 MRI
